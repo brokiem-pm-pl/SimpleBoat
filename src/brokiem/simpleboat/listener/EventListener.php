@@ -6,20 +6,21 @@ namespace brokiem\simpleboat\listener;
 
 use brokiem\simpleboat\entity\SimpleBoatEntity;
 use brokiem\simpleboat\SimpleBoat;
-use pocketmine\entity\Entity;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\event\server\DataPacketReceiveEvent;
 use pocketmine\network\mcpe\protocol\InteractPacket;
 use pocketmine\network\mcpe\protocol\InventoryTransactionPacket;
-use pocketmine\network\mcpe\protocol\PlayerInputPacket;
-use pocketmine\network\mcpe\protocol\SetActorMotionPacket;
+use pocketmine\network\mcpe\protocol\MoveActorAbsolutePacket;
 
 class EventListener implements Listener
 {
 
-    /** @var SimpleBoat */
+    /** @var SimpleBoat $plugin */
     private $plugin;
+
+    /** @var string[] $players */
+    public $players = [];
 
     public function __construct(SimpleBoat $plugin)
     {
@@ -29,12 +30,13 @@ class EventListener implements Listener
     public function onPlayerQuit(PlayerQuitEvent $event): void
     {
         $player = $event->getPlayer();
-        if ($player->getDataFlag(Entity::DATA_FLAGS, Entity::DATA_FLAG_RIDING)) {
-            foreach ($player->getLevel()->getNearbyEntities($player->getBoundingBox()->expand(2, 2, 2), $player) as $key => $entity) {
-                if ($entity instanceof SimpleBoatEntity) {
-                    $entity->unlink($player);
-                }
+
+        if (isset($this->players[$player->getName()])) {
+            $entity = $this->players[$player->getName()];
+            if ($entity instanceof SimpleBoatEntity) {
+                $entity->unlink($player);
             }
+            unset($this->players[$player->getName()]);
         }
     }
 
@@ -47,6 +49,16 @@ class EventListener implements Listener
             if ($entity instanceof SimpleBoatEntity) {
                 if ($packet->trData->actionType === InventoryTransactionPacket::USE_ITEM_ON_ENTITY_ACTION_INTERACT) {
                     if ($entity->canLink()) {
+                        if (isset($this->players[$player->getName()])) {
+                            $boatEntity = $this->players[$player->getName()];
+
+                            if ($boatEntity instanceof SimpleBoatEntity) {
+                                $boatEntity->unlink($player);
+                            }
+                        } else {
+                            $this->players[$player->getName()] = $entity;
+                        }
+
                         $entity->link($player);
                     }
 
@@ -55,14 +67,18 @@ class EventListener implements Listener
             }
         } elseif ($packet instanceof InteractPacket) {
             $entity = $player->getLevel()->getEntity($packet->target);
-            if ($entity instanceof SimpleBoatEntity) {
-                if ($packet->action === InteractPacket::ACTION_LEAVE_VEHICLE and $entity->getRider() === $player) {
-                    $entity->unlink($player);
+            if ($packet->action === InteractPacket::ACTION_LEAVE_VEHICLE and $entity instanceof SimpleBoatEntity and $entity->getRider() === $player) {
+                if (isset($this->players[$player->getName()])) {
+                    unset($this->players[$player->getName()]);
                 }
+
+                $entity->unlink($player);
                 $event->setCancelled();
             }
-        } elseif ($packet instanceof PlayerInputPacket or $packet instanceof SetActorMotionPacket) {
-            if ($player->getDataFlag(Entity::DATA_FLAGS, Entity::DATA_FLAG_RIDING)) {
+        }elseif($packet instanceof MoveActorAbsolutePacket){
+            $entity = $player->getLevel()->getEntity($packet->entityRuntimeId);
+            if($entity instanceof SimpleBoatEntity and $entity->getRider() === $player){
+                $entity->absoluteMove($packet->position, $packet->xRot, $packet->zRot);
                 $event->setCancelled();
             }
         }

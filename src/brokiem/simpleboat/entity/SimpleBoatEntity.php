@@ -11,7 +11,6 @@ use pocketmine\event\entity\EntityDamageEvent;
 use pocketmine\item\Item;
 use pocketmine\item\ItemFactory;
 use pocketmine\math\Vector3;
-use pocketmine\network\mcpe\protocol\ActorEventPacket;
 use pocketmine\network\mcpe\protocol\SetActorLinkPacket;
 use pocketmine\network\mcpe\protocol\types\EntityLink;
 use pocketmine\Player;
@@ -37,10 +36,13 @@ class SimpleBoatEntity extends Vehicle
 
     protected function initEntity(): void
     {
-        $this->setMaxHealth(40);
+        $this->setMaxHealth(4);
+        $this->setHealth(4);
         $this->setGenericFlag(self::DATA_FLAG_STACKABLE, true);
 
         $this->setBoatType($this->namedtag->getInt(self::TAG_VARIANT, 0));
+
+        $this->propertyManager->setInt(self::DATA_HURT_DIRECTION, 1);
 
         parent::initEntity();
     }
@@ -67,18 +69,30 @@ class SimpleBoatEntity extends Vehicle
         return $this->propertyManager->getInt(self::DATA_VARIANT);
     }
 
+    public function onUpdate(int $currentTick): bool
+    {
+        if ($this->closed) {
+            return false;
+        }
+
+        if ($this->ticksLived > 1200 and $this->getRider() === null and $this->getPassenger() === null) {
+            $this->close();
+        }
+
+        return parent::onUpdate($currentTick);
+    }
+
     public function attack(EntityDamageEvent $source): void
     {
-        $source->setBaseDamage($source->getBaseDamage() * 10);
-
         if (!$source->isCancelled() and $source instanceof EntityDamageByEntityEvent) {
             $damager = $source->getDamager();
 
-            $this->broadcastEntityEvent(ActorEventPacket::HURT_ANIMATION, 10);
+            $this->propertyManager->setInt(self::DATA_HURT_TIME, 10);
+            $this->propertyManager->setInt(self::DATA_HURT_DIRECTION, -$this->propertyManager->getInt(self::DATA_HURT_DIRECTION));
 
-            $flag = $damager instanceof Player and $damager->isCreative();
+            $flag = ($damager instanceof Player and $damager->isCreative());
 
-            if ($flag or $this->getHealth() <= 0) {
+            if ($flag or ($this->getHealth() - $source->getFinalDamage() < 1)) {
                 $this->kill();
 
                 if (!$flag) {
@@ -86,6 +100,8 @@ class SimpleBoatEntity extends Vehicle
                 }
             }
         }
+
+        parent::attack($source);
     }
 
     /**
@@ -97,14 +113,14 @@ class SimpleBoatEntity extends Vehicle
         if ($this->rider === null) {
             $rider->setDataFlag(self::DATA_FLAGS, self::DATA_FLAG_RIDING, true);
 
-            $rider->getDataPropertyManager()->setVector3(Entity::DATA_RIDER_SEAT_POSITION, new Vector3(0, 1, 0));
+            $rider->getDataPropertyManager()->setVector3(Entity::DATA_RIDER_SEAT_POSITION, new Vector3(0.1, 1, 0));
 
             $rider->getDataPropertyManager()->setByte(self::DATA_RIDER_ROTATION_LOCKED, 1);
             $rider->getDataPropertyManager()->setFloat(self::DATA_RIDER_MAX_ROTATION, 90);
             $rider->getDataPropertyManager()->setFloat(self::DATA_RIDER_MIN_ROTATION, -90);
 
             $pk = new SetActorLinkPacket();
-            $pk->link = new EntityLink($this->getId(), $rider->getId(), EntityLink::TYPE_RIDER, true, true);
+            $pk->link = new EntityLink($this->getId(), $rider->getId(), EntityLink::TYPE_RIDER, false, true);
             Server::getInstance()->broadcastPacket($this->getViewers(), $pk);
 
             $this->rider = $rider;
@@ -112,14 +128,14 @@ class SimpleBoatEntity extends Vehicle
         } elseif ($this->passenger === null) {
             $rider->setDataFlag(self::DATA_FLAGS, self::DATA_FLAG_RIDING, true);
 
-            $rider->getDataPropertyManager()->setVector3(Entity::DATA_RIDER_SEAT_POSITION, new Vector3(1, 1, 1));
+            $rider->getDataPropertyManager()->setVector3(Entity::DATA_RIDER_SEAT_POSITION, new Vector3(0.8, 1, 0));
 
             $rider->getDataPropertyManager()->setByte(self::DATA_RIDER_ROTATION_LOCKED, 1);
             $rider->getDataPropertyManager()->setFloat(self::DATA_RIDER_MAX_ROTATION, 90);
             $rider->getDataPropertyManager()->setFloat(self::DATA_RIDER_MIN_ROTATION, -90);
 
             $pk = new SetActorLinkPacket();
-            $pk->link = new EntityLink($this->getId(), $rider->getId(), EntityLink::TYPE_RIDER, true, true);
+            $pk->link = new EntityLink($this->getId(), $rider->getId(), EntityLink::TYPE_PASSENGER, false, true);
             Server::getInstance()->broadcastPacket($this->getViewers(), $pk);
 
             $this->passenger = $rider;
@@ -141,7 +157,7 @@ class SimpleBoatEntity extends Vehicle
             $rider->getDataPropertyManager()->setByte(self::DATA_RIDER_ROTATION_LOCKED, 0);
 
             $pk = new SetActorLinkPacket();
-            $pk->link = new EntityLink($this->getId(), $rider->getId(), EntityLink::TYPE_REMOVE, true, true);
+            $pk->link = new EntityLink($this->getId(), $rider->getId(), EntityLink::TYPE_REMOVE, false, true);
             Server::getInstance()->broadcastPacket($this->getViewers(), $pk);
 
             $this->rider = null;
@@ -153,7 +169,7 @@ class SimpleBoatEntity extends Vehicle
             $rider->getDataPropertyManager()->setByte(self::DATA_RIDER_ROTATION_LOCKED, 0);
 
             $pk = new SetActorLinkPacket();
-            $pk->link = new EntityLink($this->getId(), $rider->getId(), EntityLink::TYPE_REMOVE, true, true);
+            $pk->link = new EntityLink($this->getId(), $rider->getId(), EntityLink::TYPE_REMOVE, false, true);
             Server::getInstance()->broadcastPacket($this->getViewers(), $pk);
 
             $this->passenger = null;
@@ -163,9 +179,21 @@ class SimpleBoatEntity extends Vehicle
     }
 
     /**
+     * @param Vector3 $pos
+     * @param float|int $yaw
+     * @param float|int $pitch
+     */
+    public function absoluteMove(Vector3 $pos, float $yaw = 0, float $pitch = 0) : void{
+        $this->setComponents($pos->x, $pos->y, $pos->z);
+        $this->setRotation($yaw, $pitch);
+        $this->updateMovement();
+    }
+
+    /**
      * @return bool
      */
-    public function canLink() : bool{
+    public function canLink(): bool
+    {
         return $this->rider === null or $this->passenger === null;
     }
 
@@ -184,6 +212,4 @@ class SimpleBoatEntity extends Vehicle
     {
         return $this->passenger;
     }
-
-
 }
