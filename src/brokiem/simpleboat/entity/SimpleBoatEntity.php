@@ -113,7 +113,7 @@ class SimpleBoatEntity extends Vehicle
         if ($this->rider === null) {
             $rider->setDataFlag(self::DATA_FLAGS, self::DATA_FLAG_RIDING, true);
 
-            $rider->getDataPropertyManager()->setVector3(Entity::DATA_RIDER_SEAT_POSITION, new Vector3(0.1, 1, 0));
+            $rider->getDataPropertyManager()->setVector3(Entity::DATA_RIDER_SEAT_POSITION, new Vector3(0, 1, 0));
 
             $rider->getDataPropertyManager()->setByte(self::DATA_RIDER_ROTATION_LOCKED, 1);
             $rider->getDataPropertyManager()->setFloat(self::DATA_RIDER_MAX_ROTATION, 90);
@@ -128,7 +128,7 @@ class SimpleBoatEntity extends Vehicle
         } elseif ($this->passenger === null) {
             $rider->setDataFlag(self::DATA_FLAGS, self::DATA_FLAG_RIDING, true);
 
-            $rider->getDataPropertyManager()->setVector3(Entity::DATA_RIDER_SEAT_POSITION, new Vector3(0.8, 1, 0));
+            $rider->getDataPropertyManager()->setVector3(Entity::DATA_RIDER_SEAT_POSITION, new Vector3(-0.74, 1, 0));
 
             $rider->getDataPropertyManager()->setByte(self::DATA_RIDER_ROTATION_LOCKED, 1);
             $rider->getDataPropertyManager()->setFloat(self::DATA_RIDER_MAX_ROTATION, 90);
