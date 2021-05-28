@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace brokiem\simpleboat\listener;
 
+use _HumbugBoxa991b62ce91e\Nette\Neon\Entity;
 use brokiem\simpleboat\entity\SimpleBoatEntity;
-use brokiem\simpleboat\SimpleBoat;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerQuitEvent;
+use pocketmine\event\player\PlayerToggleSneakEvent;
 use pocketmine\event\server\DataPacketReceiveEvent;
 use pocketmine\network\mcpe\protocol\InteractPacket;
 use pocketmine\network\mcpe\protocol\InventoryTransactionPacket;
@@ -17,16 +18,8 @@ use pocketmine\network\mcpe\protocol\types\inventory\UseItemOnEntityTransactionD
 class EventListener implements Listener
 {
 
-	/** @var SimpleBoat $plugin */
-	private $plugin;
-
 	/** @var string[] $players */
 	public $players = [];
-
-	public function __construct(SimpleBoat $plugin)
-	{
-		$this->plugin = $plugin;
-	}
 
 	public function onPlayerQuit(PlayerQuitEvent $event): void
 	{
@@ -77,6 +70,19 @@ class EventListener implements Listener
 			if($entity instanceof SimpleBoatEntity and $entity->getRider() === $player) {
 				$entity->absoluteMove($packet->position, $packet->xRot, $packet->zRot);
 				$event->setCancelled();
+			}
+		}
+	}
+
+	public function onSneak(PlayerToggleSneakEvent $event) : void
+	{
+		$player = $event->getPlayer();
+		if(isset($this->players[$player->getName()])){
+			/** @var Entity $entity */
+			$entity = $this->players[$player->getName()];
+			if($entity instanceof SimpleBoatEntity){
+				$entity->unlink($player);
+				unset($this->players[$player->getName()]);
 			}
 		}
 	}

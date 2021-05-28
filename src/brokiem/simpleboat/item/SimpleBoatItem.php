@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace brokiem\simpleboat\item;
 
 use brokiem\simpleboat\entity\SimpleBoatEntity;
-use pocketmine\block\Air;
 use pocketmine\block\Block;
 use pocketmine\block\StillWater;
 use pocketmine\entity\Entity;

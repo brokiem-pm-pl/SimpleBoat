@@ -19,6 +19,6 @@ class SimpleBoat extends PluginBase
         Entity::registerEntity(SimpleBoatEntity::class, true, ["SimpleBoat"]);
         ItemFactory::registerItem(new SimpleBoatItem(), true);
 
-        $this->getServer()->getPluginManager()->registerEvents(new EventListener($this), $this);
+        $this->getServer()->getPluginManager()->registerEvents(new EventListener(), $this);
     }
 }
