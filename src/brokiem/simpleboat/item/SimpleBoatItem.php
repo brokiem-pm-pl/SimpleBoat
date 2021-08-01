@@ -17,12 +17,12 @@ class SimpleBoatItem extends Boat
 
     public function onActivate(Player $player, Block $blockReplace, Block $blockClicked, int $face, Vector3 $clickVector): bool
     {
-        if ($blockClicked instanceof StillWater) {
-            $nbt = Entity::createBaseNBT($blockClicked->getSide($face)->add(0.5, 0, 0.5));
-        } else {
+        if($blockClicked instanceof StillWater) {
+			$nbt = Entity::createBaseNBT($blockClicked->getSide($face)->add(0.5, 0, 0.5));
+		}
+        else{
             $nbt = Entity::createBaseNBT($blockClicked->getSide($face)->add(0.5, 0.4, 0.5));
         }
-
         $nbt->setInt(SimpleBoatEntity::TAG_VARIANT, $this->meta);
 
         $entity = Entity::createEntity("SimpleBoat", $blockClicked->getLevel(), $nbt);
